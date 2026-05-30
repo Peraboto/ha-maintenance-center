@@ -1,5 +1,5 @@
 name: HA Maintenance Center
-version: "1.0.3"
+version: "1.0.4"
 slug: ha_maintenance_center
 description: Storage, backup, database, resource and USB analyzer for Home Assistant OS
 url: https://github.com/Peraboto/ha-maintenance-center
