@@ -1,0 +1,33 @@
+name: HA Maintenance Center
+version: "1.0.0"
+slug: ha_maintenance_center
+description: Storage, backup, database, resource and USB analyzer for Home Assistant OS
+url: https://github.com/Peraboto/ha-maintenance-center
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: false
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:wrench-cog
+panel_title: HA Maintenance
+homeassistant_api: true
+hassio_api: true
+hassio_role: manager
+map:
+  - config:rw
+  - backup:rw
+  - media:rw
+  - share:rw
+  - addon_config:rw
+  - ssl:ro
+options:
+  scan_depth: 5
+  max_files: 8000
+  enable_delete: false
+schema:
+  scan_depth: int
+  max_files: int
+  enable_delete: bool

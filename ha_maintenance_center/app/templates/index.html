@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HA Maintenance Center</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>HA Maintenance Center</h1>
+    <button id="refresh">Aktualisieren</button>
+  </header>
+
+  <main>
+    <section class="cards" id="cards"></section>
+
+    <section class="panel">
+      <h2>Speicher-Treemap</h2>
+      <p>Große Rechtecke sind große Dateien oder Ordner. Klick auf ein Rechteck zoomt hinein.</p>
+      <div id="breadcrumb"></div>
+      <div id="treemap"></div>
+    </section>
+
+    <section class="grid">
+      <div class="panel"><h2>Backups</h2><div id="backups"></div></div>
+      <div class="panel"><h2>Datenbank</h2><div id="database"></div></div>
+      <div class="panel"><h2>USB/HID</h2><div id="usb"></div></div>
+      <div class="panel"><h2>Container</h2><div id="containers"></div></div>
+    </section>
+  </main>
+
+  <script src="/static/treemap.js"></script>
+</body>
+</html>
