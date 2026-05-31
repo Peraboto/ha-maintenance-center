@@ -2,18 +2,6 @@
 
 Home Assistant Add-on zur Analyse von Speicher, Backups, Datenbank, RAM/SWAP und USB/HID-Geräten.
 
-## Installation über GitHub
-
-1. Dieses Repository bei GitHub hochladen.
-2. In Home Assistant öffnen: **Einstellungen → Add-ons → Add-on Store → ⋮ → Repositories**.
-3. Repository-URL einfügen, z. B.:
-
-```text
-https://github.com/Peraboto/ha-maintenance-center
-```
-
-4. Add-on Store neu laden.
-5. **HA Maintenance Center** installieren und starten.
 
 ## Funktionen Version 1
 
