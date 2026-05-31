@@ -1,18 +1,19 @@
 import os
 import stat
-from pathlib import Path
 
 ROOTS = [
-    ("Config", "/config"),
     ("Backup", "/backup"),
+    ("Config", "/config"),
     ("Media", "/media"),
     ("Share", "/share"),
     ("Addon configs", "/addon_configs"),
 ]
-MAX_FILES = int(os.environ.get("MAX_FILES", "8000"))
-MAX_DEPTH = int(os.environ.get("SCAN_DEPTH", "5"))
 
-SKIP_NAMES = {"proc", "sys", "dev", "run", "tmp"}
+MAX_FILES = int(os.environ.get("MAX_FILES", "30000"))
+MAX_DEPTH = int(os.environ.get("SCAN_DEPTH", "6"))
+
+SKIP_NAMES = {"proc", "sys", "dev", "run", "tmp", "__pycache__"}
+
 
 def safe_stat(path):
     try:
@@ -20,9 +21,10 @@ def safe_stat(path):
     except Exception:
         return None
 
+
 def classify(path):
     p = str(path).lower()
-    if p.endswith(".tar") or "backup" in p:
+    if p.endswith(".tar") or "/backup" in p:
         return "backup"
     if p.endswith(".db") or p.endswith(".sqlite"):
         return "database"
@@ -34,43 +36,8 @@ def classify(path):
         return "media"
     return "other"
 
-def build_tree(path, name=None, depth=0, counter=None):
-    if counter is None:
-        counter = {"count": 0}
-    counter["count"] += 1
-    if counter["count"] > MAX_FILES:
-        return {"name": name or os.path.basename(path), "path": path, "value": 0, "type": "limit"}
 
-    st = safe_stat(path)
-    if not st:
-        return {"name": name or os.path.basename(path), "path": path, "value": 0, "type": "error"}
-
-    if stat.S_ISLNK(st.st_mode):
-        return {"name": name or os.path.basename(path), "path": path, "value": 0, "type": "symlink"}
-
-    if stat.S_ISDIR(st.st_mode):
-        node = {"name": name or os.path.basename(path) or path, "path": path, "children": [], "type": "folder"}
-        if depth >= MAX_DEPTH:
-            node["value"] = directory_size(path)
-            return node
-        try:
-            entries = sorted(os.scandir(path), key=lambda e: e.name.lower())
-        except Exception:
-            node["value"] = 0
-            node["type"] = "error"
-            return node
-        total = 0
-        for e in entries:
-            if e.name in SKIP_NAMES:
-                continue
-            child = build_tree(e.path, e.name, depth + 1, counter)
-            val = child.get("value", 0) or sum(c.get("value", 0) for c in child.get("children", []))
-            total += val
-            node["children"].append(child)
-        node["value"] = total
-        node["children"] = sorted(node["children"], key=lambda c: c.get("value", 0), reverse=True)[:200]
-        return node
-
+def file_node(path, name, st):
     return {
         "name": name or os.path.basename(path),
         "path": path,
@@ -79,20 +46,126 @@ def build_tree(path, name=None, depth=0, counter=None):
         "mtime": int(st.st_mtime),
     }
 
-def directory_size(path):
+
+def directory_fast_children(path, name, depth, counter):
+    node = {
+        "name": name or os.path.basename(path) or path,
+        "path": path,
+        "children": [],
+        "type": "folder",
+    }
+
+    try:
+        entries = list(os.scandir(path))
+    except Exception:
+        node["value"] = 0
+        node["type"] = "error"
+        return node
+
     total = 0
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            try:
-                total += os.path.getsize(os.path.join(root, f))
-            except Exception:
-                pass
+
+    for e in entries:
+        if e.name in SKIP_NAMES:
+            continue
+
+        child = build_tree(e.path, e.name, depth + 1, counter)
+        val = child.get("value", 0)
+        total += val
+        node["children"].append(child)
+
+    node["value"] = total
+    node["children"] = sorted(
+        [c for c in node["children"] if c.get("value", 0) > 0],
+        key=lambda c: c.get("value", 0),
+        reverse=True
+    )[:500]
+
+    return node
+
+
+def directory_total_size(path):
+    total = 0
+    try:
+        for root, dirs, files in os.walk(path):
+            dirs[:] = [d for d in dirs if d not in SKIP_NAMES]
+            for f in files:
+                fp = os.path.join(root, f)
+                try:
+                    total += os.path.getsize(fp)
+                except Exception:
+                    pass
+    except Exception:
+        pass
     return total
+
+
+def build_tree(path, name=None, depth=0, counter=None):
+    if counter is None:
+        counter = {"count": 0}
+
+    counter["count"] += 1
+    if counter["count"] > MAX_FILES:
+        return {
+            "name": name or os.path.basename(path),
+            "path": path,
+            "value": directory_total_size(path) if os.path.isdir(path) else 0,
+            "type": "limit",
+        }
+
+    st = safe_stat(path)
+    if not st:
+        return {
+            "name": name or os.path.basename(path),
+            "path": path,
+            "value": 0,
+            "type": "error",
+        }
+
+    if stat.S_ISLNK(st.st_mode):
+        return {
+            "name": name or os.path.basename(path),
+            "path": path,
+            "value": 0,
+            "type": "symlink",
+        }
+
+    if stat.S_ISREG(st.st_mode):
+        return file_node(path, name, st)
+
+    if stat.S_ISDIR(st.st_mode):
+        if depth >= MAX_DEPTH:
+            return {
+                "name": name or os.path.basename(path) or path,
+                "path": path,
+                "value": directory_total_size(path),
+                "children": [],
+                "type": "folder",
+            }
+
+        return directory_fast_children(path, name, depth, counter)
+
+    return {
+        "name": name or os.path.basename(path),
+        "path": path,
+        "value": 0,
+        "type": "other",
+    }
+
 
 def scan_roots():
     children = []
-    counter = {"count": 0}
+
     for label, path in ROOTS:
         if os.path.exists(path):
+            counter = {"count": 0}
             children.append(build_tree(path, label, 0, counter))
-    return {"name": "Home Assistant", "path": "/", "children": children}
+
+    children = sorted(children, key=lambda c: c.get("value", 0), reverse=True)
+
+    return {
+        "name": "Home Assistant",
+        "path": "/",
+        "children": children,
+        "value": sum(c.get("value", 0) for c in children),
+        "type": "folder",
+    }
